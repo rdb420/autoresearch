@@ -23,9 +23,11 @@ Once you get confirmation, kick off the experimentation.
 Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
 
 **What you CAN do:**
+
 - Modify `train.py` — this is the only file you edit. Everything is fair game: model architecture, optimizer, hyperparameters, training loop, batch size, model size, etc.
 
 **What you CANNOT do:**
+
 - Modify `prepare.py`. It is read-only. It contains the fixed evaluation, data loading, tokenizer, and training constants (time budget, sequence length, etc).
 - Install new packages or add dependencies. You can only use what's already in `pyproject.toml`.
 - Modify the evaluation harness. The `evaluate_bpb` function in `prepare.py` is the ground truth metric.
@@ -42,7 +44,7 @@ Each experiment runs on a single GPU. The training script runs for a **fixed tim
 
 Once the script finishes it prints a summary like this:
 
-```
+```bash
 ---
 val_bpb:          0.997900
 training_seconds: 300.1
@@ -57,7 +59,7 @@ depth:            8
 
 Note that the script is configured to always stop after 5 minutes, so depending on the computing platform of this computer the numbers might look different. You can extract the key metric from the log file:
 
-```
+```bash
 grep "^val_bpb:" run.log
 ```
 
@@ -67,8 +69,8 @@ When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-se
 
 The TSV has a header row and 5 columns:
 
-```
-commit	val_bpb	memory_gb	status	description
+```bash
+commit val_bpb memory_gb status description
 ```
 
 1. git commit hash (short, 7 chars)
@@ -79,12 +81,12 @@ commit	val_bpb	memory_gb	status	description
 
 Example:
 
-```
-commit	val_bpb	memory_gb	status	description
-a1b2c3d	0.997900	44.0	keep	baseline
-b2c3d4e	0.993200	44.2	keep	increase LR to 0.04
-c3d4e5f	1.005000	44.0	discard	switch to GeLU activation
-d4e5f6g	0.000000	0.0	crash	double model width (OOM)
+```bash
+commit val_bpb memory_gb status description
+a1b2c3d 0.997900 44.0 keep baseline
+b2c3d4e 0.993200 44.2 keep increase LR to 0.04
+c3d4e5f 1.005000 44.0 discard switch to GeLU activation
+d4e5f6g 0.000000 0.0 crash double model width (OOM)
 ```
 
 ## The experiment loop
@@ -112,3 +114,103 @@ The idea is that you are a completely autonomous researcher trying things out. I
 **NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
 
 As an example use case, a user might leave you running while they sleep. If each experiment takes you ~5 minutes then you can run approx 12/hour, for a total of about 100 over the duration of the average human sleep. The user then wakes up to experimental results, all completed by you while they slept!
+
+---
+
+Deep Machine Learning Reference Library:
+
+Use these research resources when brainstorming, when stuck, or researching the best next steps.
+
+- **[Data Science and Machine Learning](Library/Deep-Machine_Learning/Data_Science_And_Machine_Learning/Data_Science_And_Machine_Learning.md)**  
+  Covers:  
+  - The foundational concepts of data science  
+  - Machine learning algorithms  
+  - Data preprocessing and feature engineering  
+  - Supervised and unsupervised learning  
+  - Model evaluation and tuning  
+  - Practical case studies and applications
+
+- **[Deep Learning with Python](Library/Deep-Machine_Learning/DEEP_LEARNIN_With_Python/DEEP_LEARNIN_With_Python.md)**  
+  Covers:  
+  - Introduction to neural networks and deep learning  
+  - Keras and TensorFlow basics  
+  - Convolutional networks, recurrent networks, and use cases  
+  - Practical projects in computer vision and natural language processing  
+  - Tips for model optimization and tuning
+
+- **[Deep Learning](Library/Deep-Machine_Learning/Deep_Learning/Deep_Learning.md)**  
+  Covers:  
+  - Fundamentals of deep learning and representation learning  
+  - Mathematical and conceptual building blocks  
+  - Common architectures: MLPs, CNNs, RNNs  
+  - Optimization, regularization, and unsupervised learning strategies  
+  - Applications to vision, language, and generative models
+
+- **[Deep Learning (2008-12-01 version)](Library/Deep-Machine_Learning/DEEP_LEARNING_2008-12-01/DEEP_LEARNING_2008-12-01.md)**  
+  Covers:  
+  - Early foundational perspective on deep learning  
+  - Historical context and development of neural network models  
+  - Key algorithms and architectures as of 2008  
+  - Insights and trends in neural computation
+
+- **[Deep Learning Methods and Applications](Library/Deep-Machine_Learning/Deep_Learning_Methods_And_Applications/Deep_Learning_Methods_And_Applications.md)**  
+  Covers:  
+  - Survey of deep learning techniques  
+  - Application areas: speech recognition, computer vision, NLP  
+  - Case studies and system design  
+  - Comparison of classical and deep learning approaches
+
+- **[Foundations Of Machine Learning](Library/Deep-Machine_Learning/Foundations_Of_Machine_Learning/Foundations_Of_Machine_Learning.md)**  
+  Covers:  
+  - Theoretical underpinnings of ML  
+  - Statistical learning theory  
+  - PAC learning, VC dimensions  
+  - Linear and nonlinear models  
+  - Algorithmic frameworks and proofs
+
+- **[Introduction To Machine Learning](Library/Deep-Machine_Learning/Introduction_To_Machine_Learning/Introduction_To_Machine_Learning.md)**  
+  Covers:  
+  - Beginner-friendly intro to ML concepts  
+  - Overview of supervised and unsupervised methods  
+  - Core algorithms (SVM, decision trees, clustering)  
+  - Model selection and validation  
+  - Hands-on practical advice
+
+- **[Machine Learning Handbook](Library/Deep-Machine_Learning/Machine_Learning_Handbook/Machine_Learning_Handbook.md)**  
+  Covers:  
+  - Comprehensive algorithms reference  
+  - Feature extraction and data representation  
+  - Ensemble models and hybrid strategies  
+  - Practical programming guides and recipes
+
+- **[Pattern Recognition and Machine Learning (C. M. Bishop)](Library/Deep-Machine_Learning/PATTERN_RECOGNITION_AND_MACHINE_LEARNING_CHRISTOPHER_M._BISHOP/PATTERN_RECOGNITION_AND_MACHINE_LEARNING_CHRISTOPHER_M._BISHOP.md)**  
+  Covers:  
+  - Probability and statistics for ML  
+  - Bayesian networks  
+  - Kernel methods  
+  - Graphical models  
+  - Pattern recognition theory and application
+
+- **[Practical Machine Learning: A Beginner’s Guide With Ethical Considerations](Library/Deep-Machine_Learning/Practical_Machine_Learning_A_Beginner’s_Guide_With_Ethical/Practical_Machine_Learning_A_Beginner’s_Guide_With_Ethical.md)**  
+  Covers:  
+  - ML project workflow from data collection to deployment  
+  - Real-world examples and best practices  
+  - Ethical concerns in ML and responsible AI  
+  - Model transparency and fairness
+
+- **[The Hundred-Page Machine Learning Book](Library/Deep-Machine_Learning/The_Hundred-page/The_Hundred-page.md)**  
+  Covers:  
+  - Compressed yet thorough overview of ML fundamentals  
+  - Algorithms and math essentials  
+  - Neural networks, SVMs, decision trees, boosting  
+  - Popular models and their use-cases  
+  - Interview-style Q&A and summaries
+
+- **[Understanding Machine Learning: From Theory to Algorithms](Library/Deep-Machine_Learning/Understanding_Machine_Learning_From_Theory_To_Algorithms/Understanding_Machine_Learning_From_Theory_To_Algorithms.md)**  
+  Covers:  
+  - Mathematical foundation of ML  
+  - Generalization, capacity, and learnability  
+  - Major algorithms and proof techniques  
+  - Optimization, convexity, and practical considerations
+
+// Each entry includes a high-level chapter/topic list (from the book's table of contents or preface) and a link to a `.md` file in the corresponding folder.  
