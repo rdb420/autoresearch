@@ -1,6 +1,9 @@
+import os
+import tempfile
 import unittest
+from pathlib import Path
 
-from run_log_viz import parse_run_log_text
+from run_log_viz import load_latest_log, parse_run_log_text
 
 
 SAMPLE_LOG = """Vocab size: 8,192
@@ -47,6 +50,51 @@ class ParseRunLogTextTests(unittest.TestCase):
         parsed = parse_run_log_text("hello\nworld\n")
         self.assertEqual(parsed["steps"], [])
         self.assertEqual(parsed["summary"], {})
+
+    def test_parses_terminal_style_concatenated_steps(self):
+        terminal_text = (
+            "---\n"
+            "pid: 177216\n"
+            "cwd: /tmp/project\n"
+            "last_command: uv run train.py\n"
+            "last_exit_code: 0\n"
+            "---\n"
+            "step 01259 (55.7%) | loss: 3.518488 | lrm: 0.89 | dt: 134ms | "
+            "tok/sec: 243,809 | mfu: 3.0% | epoch: 1 | remaining: 133s"
+            "step 01260 (55.8%) | loss: 3.527451 | lrm: 0.88 | dt: 135ms | "
+            "tok/sec: 243,201 | mfu: 3.0% | epoch: 1 | remaining: 132s"
+        )
+
+        parsed = parse_run_log_text(terminal_text)
+
+        self.assertEqual(len(parsed["steps"]), 2)
+        self.assertEqual(parsed["steps"][0]["step"], 1259)
+        self.assertEqual(parsed["steps"][1]["step"], 1260)
+        self.assertEqual(parsed["steps"][1]["remaining_seconds"], 132)
+
+    def test_load_latest_log_prefers_newer_live_source(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp_path = Path(tmpdir)
+            run_log = tmp_path / "run.log"
+            terminal_log = tmp_path / "terminal.txt"
+
+            run_log.write_text(
+                "step 02233 (100.0%) | loss: 3.222948 | lrm: 0.00 | dt: 136ms | "
+                "tok/sec: 241,787 | mfu: 2.9% | epoch: 1 | remaining: 0s\n"
+            )
+            terminal_log.write_text(
+                "step 00010 (0.4%) | loss: 6.239288 | lrm: 1.00 | dt: 132ms | "
+                "tok/sec: 247,695 | mfu: 3.0% | epoch: 1 | remaining: 299s\n"
+            )
+
+            os.utime(run_log, (1, 1))
+            os.utime(terminal_log, None)
+
+            loaded = load_latest_log([run_log, terminal_log])
+
+            self.assertTrue(loaded["exists"])
+            self.assertEqual(loaded["path"], terminal_log)
+            self.assertEqual(loaded["steps"][-1]["step"], 10)
 
 
 if __name__ == "__main__":
