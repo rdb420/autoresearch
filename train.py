@@ -4,7 +4,11 @@ Cherry-picked and simplified from nanochat.
 Usage: uv run train.py
 """
 
+import atexit
 import os
+import sys
+from pathlib import Path
+
 os.environ["PYTORCH_ALLOC_CONF"] = "expandable_segments:True"
 os.environ["HF_HUB_DISABLE_PROGRESS_BARS"] = "1"
 
@@ -16,7 +20,60 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from autoresearch_runtime import TeeTextIO, complete_run, start_run
 from kernels import get_kernel
+
+WORKSPACE_ROOT = Path(__file__).resolve().parent
+TRAIN_RUN = start_run(
+    WORKSPACE_ROOT,
+    command=["uv", "run", "train.py"],
+    pid=os.getpid(),
+)
+RUN_EXIT = {"code": 0}
+_ORIGINAL_STDOUT = sys.stdout
+_ORIGINAL_STDERR = sys.stderr
+_ORIGINAL_EXCEPTHOOK = sys.excepthook
+
+_canonical_run_log = Path(TRAIN_RUN["canonical_log_path"])
+_run_stdout_log = Path(TRAIN_RUN["stdout_path"])
+_canonical_log_handle = _canonical_run_log.open("w", encoding="utf-8", buffering=1)
+_run_stdout_handle = _run_stdout_log.open("w", encoding="utf-8", buffering=1)
+sys.stdout = TeeTextIO(_ORIGINAL_STDOUT, _canonical_log_handle, _run_stdout_handle)
+sys.stderr = TeeTextIO(_ORIGINAL_STDERR, _canonical_log_handle, _run_stdout_handle)
+
+
+def _track_uncaught_exception(exc_type, exc, tb):
+    RUN_EXIT["code"] = 1
+    _ORIGINAL_EXCEPTHOOK(exc_type, exc, tb)
+
+
+def _tracked_sys_exit(code=0):
+    if code is None:
+        RUN_EXIT["code"] = 0
+    elif isinstance(code, int):
+        RUN_EXIT["code"] = code
+    else:
+        RUN_EXIT["code"] = 1
+    raise SystemExit(code)
+
+
+def _finalize_autoresearch_run() -> None:
+    try:
+        _canonical_log_handle.flush()
+        _run_stdout_handle.flush()
+        complete_run(WORKSPACE_ROOT, TRAIN_RUN["run_id"], exit_code=int(RUN_EXIT["code"] or 0))
+    except Exception as exc:  # pragma: no cover - best-effort cleanup path
+        _ORIGINAL_STDERR.write(f"\n[autoresearch runtime] failed to finalize run: {exc}\n")
+        _ORIGINAL_STDERR.flush()
+    finally:
+        _canonical_log_handle.close()
+        _run_stdout_handle.close()
+
+
+sys.excepthook = _track_uncaught_exception
+sys.exit = _tracked_sys_exit
+atexit.register(_finalize_autoresearch_run)
+
 cap = torch.cuda.get_device_capability()
 # varunneal's FA3 is Hopper only, use kernels-community on non-Hopper GPUs
 repo = "varunneal/flash-attention-3" if cap == (9, 0) else "kernels-community/flash-attn3"
@@ -568,7 +625,7 @@ while True:
     # Fast fail: abort if loss is exploding
     if train_loss_f > 100:
         print("FAIL")
-        exit(1)
+        sys.exit(1)
 
     torch.cuda.synchronize()
     t1 = time.time()

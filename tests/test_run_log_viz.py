@@ -3,7 +3,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from run_log_viz import load_latest_log, parse_run_log_text
+from autoresearch_runtime import start_run
+from run_log_viz import load_latest_log, load_workspace_log, parse_run_log_text
 
 
 SAMPLE_LOG = """Vocab size: 8,192
@@ -95,6 +96,33 @@ class ParseRunLogTextTests(unittest.TestCase):
             self.assertTrue(loaded["exists"])
             self.assertEqual(loaded["path"], terminal_log)
             self.assertEqual(loaded["steps"][-1]["step"], 10)
+
+    def test_load_workspace_log_prefers_current_manifest_log_over_newer_repo_log(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            workspace_root = Path(tmpdir)
+            run = start_run(
+                workspace_root,
+                command=["uv", "run", "train.py"],
+                run_id="run-123",
+                pid=4242,
+            )
+            repo_run_log = workspace_root / "run.log"
+            manifest_log = Path(run["stdout_path"])
+
+            manifest_log.write_text(
+                "step 00020 (1.0%) | loss: 6.000000 | lrm: 1.00 | dt: 120ms | "
+                "tok/sec: 250,000 | mfu: 3.1% | epoch: 1 | remaining: 290s\n"
+            )
+            repo_run_log.write_text(
+                "step 09999 (100.0%) | loss: 2.000000 | lrm: 0.00 | dt: 100ms | "
+                "tok/sec: 260,000 | mfu: 4.0% | epoch: 1 | remaining: 0s\n"
+            )
+            os.utime(repo_run_log, None)
+
+            loaded = load_workspace_log(workspace_root)
+
+            self.assertEqual(loaded["path"], manifest_log)
+            self.assertEqual(loaded["steps"][-1]["step"], 20)
 
 
 if __name__ == "__main__":

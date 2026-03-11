@@ -12,8 +12,8 @@ To set up a new experiment, work with the user to:
    - `README.md` — repository context.
    - `prepare.py` — fixed constants, data prep, tokenizer, dataloader, evaluation. Do not modify.
    - `train.py` — the file you modify. Model architecture, optimizer, training loop.
-4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, tell the human to run `uv run prepare.py`.
-5. **Initialize results.tsv**: Create `results.tsv` with just the header row. The baseline will be recorded after the first run.
+4. **Verify data exists**: Check that `~/.cache/autoresearch/` contains data shards and a tokenizer. If not, run `uv run prepare.py` yourself before proceeding.
+5. **Verify runtime state is writable**: The repo now keeps local run state under `.autoresearch/` and auto-manages `results.tsv`. Make sure the workspace is writable and those files can be created.
 6. **Confirm and go**: Confirm setup looks good.
 
 Once you get confirmation, kick off the research phase.
@@ -47,6 +47,13 @@ You have access to brainstorming and sequential thinking tools. **Use them.** Be
 ## Experimentation
 
 Each experiment runs on a single GPU. The training script runs for a **fixed time budget of 5 minutes** (wall clock training time, excluding startup/compilation). You launch it simply as: `uv run train.py`.
+
+The runtime now handles the operational handoff automatically:
+
+- `run.log` is always written in the repo root
+- each run also gets a manifest and per-run stdout log under `.autoresearch/`
+- `results.tsv` is initialized and updated automatically
+- if a previous run was left in `running`, the next start reconciles it to an interrupted state before continuing
 
 **What you CAN do:**
 
@@ -107,7 +114,7 @@ grep "^val_bpb:" run.log
 
 ## Logging results
 
-When an experiment is done, log it to `results.tsv` (tab-separated, NOT comma-separated — commas break in descriptions).
+When an experiment is done, the runtime records it to `results.tsv` automatically (tab-separated, NOT comma-separated — commas break in descriptions).
 
 The TSV has a header row and 5 columns:
 
@@ -116,8 +123,8 @@ commit val_bpb memory_gb status description
 ```
 
 1. git commit hash (short, 7 chars)
-2. val_bpb achieved (e.g. 1.234567) — use 0.000000 for crashes
-3. peak memory in GB, round to .1f (e.g. 12.3 — divide peak_vram_mb by 1024) — use 0.0 for crashes
+2. val_bpb achieved (e.g. 1.234567) — the runtime uses `0.000000` for crashes
+3. peak memory in GB, round to `.1f` (e.g. `12.3` — divide `peak_vram_mb` by 1024) — the runtime uses `0.0` for crashes
 4. status: `keep`, `discard`, or `crash`
 5. short text description of what this experiment tried
 
@@ -171,19 +178,18 @@ LOOP FOREVER:
 1. **Think first**: Review the git state, prior results, and form your hypothesis (see scientific method above). Use brainstorming and sequential thinking tools.
 2. **Modify `train.py`**: Make your changes. You can change anything and everything in this file — architecture, optimizer, hyperparameters, training loop, schedules, all at once if your reasoning supports it.
 3. **git commit**: Write a commit message that includes your hypothesis and reasoning (not just "changed X to Y").
-4. **Run the experiment**: `uv run train.py > run.log 2>&1` (redirect everything — do NOT use tee or let output flood your context)
-5. **Read the results**: `grep "^val_bpb:\|^peak_vram_mb:" run.log`
-6. **Handle crashes**: If the grep output is empty, the run crashed. Run `tail -n 50 run.log` to read the Python stack trace and attempt a fix. If you can't get things to work after more than a few attempts, give up.
-7. **Analyze**: Compare outcome to hypothesis. Write your analysis in the tsv description and/or commit message. What did you learn?
-8. **Record the results** in `results.tsv` (NOTE: do not commit the results.tsv file, leave it untracked by git)
-9. **Keep or discard**: If val_bpb improved (lower), keep the git commit. If val_bpb is equal or worse, git reset back to where you started.
-10. **Plan next**: Based on what you just learned, form the hypothesis for the next experiment. Go to step 1.
+4. **Run the experiment**: `uv run train.py`
+5. **Read the results**: inspect `run.log`, `.autoresearch/state/current_run.json`, and `.autoresearch/state/last_run.json` as the source of truth for the active or most recent run.
+6. **Handle crashes**: If the final summary is missing, the run crashed. Read the tail of `run.log`, inspect the reconciled manifest state, and attempt a fix. If you can't get things to work after more than a few attempts, give up.
+7. **Analyze**: Compare outcome to hypothesis. The runtime records a result row automatically; use your commit message and follow-up reasoning to capture what you learned.
+8. **Keep or discard**: Use the recorded metrics and prior results to decide whether to keep the code change. The runtime auto-classifies the result row, but you still own the research judgment about what to try next.
+9. **Plan next**: Based on what you just learned, form the hypothesis for the next experiment. Go to step 1.
 
 The idea is that you are a completely autonomous researcher trying things out. If they work, keep. If they don't, discard. And you're advancing the branch so that you can iterate. If you feel like you're getting stuck in some way, you can rewind but you should probably do this very very sparingly (if ever).
 
 **Timeout**: Each experiment should take ~5 minutes total (+ a few seconds for startup and eval overhead). If a run exceeds 10 minutes, kill it and treat it as a failure (discard and revert).
 
-**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, log "crash" as the status in the tsv, and move on.
+**Crashes**: If a run crashes (OOM, or a bug, or etc.), use your judgment: If it's something dumb and easy to fix (e.g. a typo, a missing import), fix it and re-run. If the idea itself is fundamentally broken, just skip it, let the runtime record the crash row, and move on.
 
 **NEVER STOP**: Once the experiment loop has begun (after the initial setup), do NOT pause to ask the human if you should continue. Do NOT ask "should I keep going?" or "is this a good stopping point?". The human might be asleep, or gone from a computer and expects you to continue working *indefinitely* until you are manually stopped. You are autonomous. If you run out of ideas, think harder — read papers referenced in the code, re-read the in-scope files for new angles, try combining previous near-misses, try more radical architectural changes. The loop runs until the human interrupts you, period.
 

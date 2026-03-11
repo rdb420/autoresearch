@@ -3,6 +3,8 @@ import os
 import unittest
 from pathlib import Path
 
+from notebook_live_dashboard import _status_markdown
+
 
 class VisualizeRunLogNotebookTests(unittest.TestCase):
     def test_notebook_entry_points_exist(self):
@@ -18,6 +20,12 @@ class VisualizeRunLogNotebookTests(unittest.TestCase):
         namespace = {}
 
         exec(compile(snapshot_source, "snapshot_cell", "exec"), namespace)
+
+    def test_waiting_message_uses_direct_train_command(self):
+        message = _status_markdown({"exists": False, "summary": {}, "steps": []})
+
+        self.assertIn("`uv run train.py`", message)
+        self.assertNotIn("> run.log 2>&1", message)
 
 
 if __name__ == "__main__":

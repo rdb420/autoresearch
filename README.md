@@ -39,15 +39,27 @@ uv run train.py
 
 If the above commands all work ok, your setup is working and you can go into autonomous research mode.
 
+Training runs now manage their own local runtime state automatically:
+
+- `uv run train.py` always writes the canonical repo-root `run.log`
+- each run also gets an isolated per-run log and manifest under `.autoresearch/`
+- `results.tsv` is auto-initialized and auto-recorded after each run
+- interrupted runs are reconciled on the next start so a fresh agent can resume from explicit state instead of guessing
+
 ## Running the agent
 
-Simply spin up your Claude/Codex or whatever you want in this repo (and disable all permissions), then you can prompt something like:
+Spin up your Claude/Codex or whatever you want in this repo, then prompt something like:
 
 ```
 Hi have a look at program.md and let's kick off a new experiment! let's do the setup first.
 ```
 
-The `program.md` file is essentially a super lightweight "skill".
+The `program.md` file is essentially a super lightweight "skill". The repo-local runtime state for the currently active run lives under `.autoresearch/state/`:
+
+- `current_run.json` points at the active run while training is in progress
+- `last_run.json` points at the most recently completed or reconciled run
+
+Those files are the first place a new agent should look when resuming after interruption.
 
 ## Project structure
 
@@ -60,7 +72,7 @@ pyproject.toml  — dependencies
 
 ## Design choices
 
-- **Single file to modify.** The agent only touches `train.py`. This keeps the scope manageable and diffs reviewable.
+- **Single primary training file.** Most research changes still happen in `train.py`, but small support modules for runtime state, log parsing, and analysis are also in play now so autonomous handoffs stay deterministic.
 - **Fixed time budget.** Training always runs for exactly 5 minutes, regardless of your specific platform. This means you can expect approx 12 experiments/hour and approx 100 experiments while you sleep. There are two upsides of this design decision. First, this makes experiments directly comparable regardless of what the agent changes (model size, batch size, architecture, etc). Second, this means that autoresearch will find the most optimal model for your platform in that time budget. The downside is that your runs (and results) become not comparable to other people running on other compute platforms.
 - **Self-contained.** No external dependencies beyond PyTorch and a few small packages. No distributed training, no complex configs. One GPU, one file, one metric.
 

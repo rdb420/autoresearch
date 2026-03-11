@@ -4,17 +4,15 @@ from pathlib import Path
 from time import sleep
 from typing import Any
 
-from run_log_viz import discover_cursor_terminal_logs, load_latest_log, steps_to_frame
+from run_log_viz import load_workspace_log, steps_to_frame
 
 
 def load_current_log(
     run_log_path: str | Path = "run.log",
     workspace_root: str | Path | None = None,
 ) -> dict[str, Any]:
-    run_log_path = Path(run_log_path)
     workspace_root = Path.cwd().resolve() if workspace_root is None else Path(workspace_root).resolve()
-    candidate_paths = [run_log_path, *discover_cursor_terminal_logs(workspace_root)]
-    return load_latest_log(candidate_paths)
+    return load_workspace_log(workspace_root=workspace_root, run_log_path=run_log_path)
 
 
 def _format_int(value: float | int) -> str:
@@ -30,7 +28,7 @@ def _status_markdown(parsed: dict, run_log_path: str | Path = "run.log") -> str:
         return (
             f"## Waiting for `{Path(path).name}`\n\n"
             "No log file exists yet. Start training in another terminal with "
-            "`uv run train.py > run.log 2>&1`, then rerun or keep the live monitor cell running."
+            "`uv run train.py`, then rerun or keep the live monitor cell running."
         )
 
     if not steps:
@@ -56,8 +54,7 @@ def _status_markdown(parsed: dict, run_log_path: str | Path = "run.log") -> str:
     ]
 
     if summary:
-        lines.append("")
-        lines.append("### Final Summary")
+        lines.extend(["", "### Final Summary"])
         if "val_bpb" in summary:
             lines.append(f"- val_bpb: `{summary['val_bpb']:.6f}`")
         if "training_seconds" in summary:

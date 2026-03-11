@@ -5,6 +5,7 @@ from itertools import chain
 from pathlib import Path
 from typing import Any
 
+from autoresearch_runtime import preferred_log_candidates
 
 STEP_RE = re.compile(
     r"step\s+"
@@ -47,8 +48,7 @@ def parse_run_log_text(text: str) -> dict[str, Any]:
         )
 
     for line in text.splitlines():
-        summary_match = SUMMARY_RE.match(line)
-        if summary_match:
+        if summary_match := SUMMARY_RE.match(line):
             key = summary_match.group("key")
             try:
                 summary[key] = _parse_number(summary_match.group("value"))
@@ -108,6 +108,22 @@ def discover_cursor_terminal_logs(workspace_root: str | Path) -> list[Path]:
         matches.append(path)
 
     return matches
+
+
+def load_workspace_log(
+    workspace_root: str | Path,
+    run_log_path: str | Path = "run.log",
+) -> dict[str, Any]:
+    workspace_root = Path(workspace_root).resolve()
+    for candidate in preferred_log_candidates(workspace_root, run_log_path=run_log_path):
+        parsed = load_run_log(candidate)
+        if parsed["exists"] and (parsed["steps"] or parsed["summary"]):
+            return parsed
+
+    terminal_candidates = discover_cursor_terminal_logs(workspace_root)
+    if terminal_candidates:
+        return load_latest_log(terminal_candidates)
+    return load_run_log(Path(workspace_root) / run_log_path)
 
 
 def steps_to_frame(steps: list[dict[str, Any]]) -> pd.DataFrame:
